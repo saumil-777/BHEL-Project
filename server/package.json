@@ -1,0 +1,39 @@
+{
+  "name": "smimp-server",
+  "version": "1.0.0",
+  "description": "Smart Material & Inventory Management Platform - Backend API",
+  "main": "src/app.js",
+  "scripts": {
+    "start": "node src/app.js",
+    "dev": "nodemon src/app.js",
+    "migrate": "knex migrate:latest --knexfile src/config/knexfile.js",
+    "seed": "knex seed:run --knexfile src/config/knexfile.js"
+  },
+  "keywords": [],
+  "author": "SMIMP",
+  "license": "ISC",
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  },
+  "dependencies": {
+    "archiver": "^8.0.0",
+    "bcryptjs": "^3.0.3",
+    "better-sqlite3": "^12.10.0",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "exceljs": "^4.4.0",
+    "express": "^5.2.1",
+    "express-validator": "^7.3.2",
+    "helmet": "^8.2.0",
+    "jsonwebtoken": "^9.0.3",
+    "knex": "^3.2.10",
+    "morgan": "^1.10.1",
+    "multer": "^2.1.1",
+    "nodemailer": "^8.0.10",
+    "pdfkit": "^0.18.0",
+    "pg": "^8.21.0",
+    "pg-mem": "^3.0.14",
+    "socket.io": "^4.8.3",
+    "uuid": "^14.0.0"
+  }
+}
