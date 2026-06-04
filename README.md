@@ -191,15 +191,6 @@ All local accounts are pre-seeded with the default password: **`Admin@123`**
 | **Store Keeper** | `storekeeper@bhel.in` | Stores |
 | **Viewer (Read-Only)** | `viewer@bhel.in` | Finance |
 
----
-
-## 📸 Screenshots Section
-
-*Add screenshots here once deployed or local server is captured.*
-
-<p align="center">
-  <img src="client/src/assets/hero.png" alt="SMIMP Dashboard Interface" width="90%" style="border-radius: 8px; border: 1px solid var(--border);" />
-</p>
 
 ---
 
