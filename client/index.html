@@ -8,6 +8,16 @@
     <title>SMIMP — Smart Material & Inventory Management Platform</title>
   <meta name="description" content="Enterprise platform for material tracking, inventory management, quality control, and warehouse operations." />
   <meta name="theme-color" content="#0f1117" />
+    <script>
+      (function() {
+        const theme = localStorage.getItem('theme') || 'dark';
+        if (theme === 'light') {
+          document.documentElement.setAttribute('data-theme', 'light');
+        } else {
+          document.documentElement.removeAttribute('data-theme');
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
