@@ -180,3 +180,227 @@ exports.getLowStock = async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch low stock items' });
   }
 };
+
+function calculateMaterialForecast(material, sivsForMaterial) {
+  const currentQty = +material.quantity;
+  const minStock = +material.min_stock_level || 0;
+  const reorderLevel = +material.reorder_level || 0;
+  
+  if (!sivsForMaterial || sivsForMaterial.length === 0) {
+    return {
+      material_id: material.id,
+      name: material.name,
+      material_code: material.material_id,
+      category: material.category,
+      unit: material.unit,
+      current_quantity: currentQty,
+      min_stock_level: minStock,
+      reorder_level: reorderLevel,
+      has_history: false,
+      recommended_reorder_qty: Math.max(0, (reorderLevel * 2) - currentQty),
+      forecasts: null
+    };
+  }
+
+  // Calculate Average Daily Rate (ADR)
+  const totalIssued = sivsForMaterial.reduce((acc, s) => acc + (+s.quantity_issued || 0), 0);
+  
+  const oldestSivDate = new Date(Math.min(...sivsForMaterial.map(s => new Date(s.date_issued))));
+  const today = new Date();
+  const timeDiff = Math.abs(today - oldestSivDate);
+  const diffDays = Math.max(1, Math.ceil(timeDiff / (1000 * 60 * 60 * 24)));
+  
+  const dailyRateADR = totalIssued / diffDays;
+
+  // Group weekly usage for 12 weeks
+  const weeklyUsage = Array(12).fill(0);
+  const oneWeekMs = 7 * 24 * 60 * 60 * 1000;
+  
+  sivsForMaterial.forEach(s => {
+    const sDate = new Date(s.date_issued);
+    const ageWeeks = Math.floor((today - sDate) / oneWeekMs);
+    if (ageWeeks >= 0 && ageWeeks < 12) {
+      weeklyUsage[11 - ageWeeks] += (+s.quantity_issued || 0);
+    }
+  });
+
+  // 1. ADR Calculations
+  let adrDays = null;
+  let adrStockOutDate = null;
+  let adrReorderDays = null;
+  let adrReorderDate = null;
+
+  if (dailyRateADR > 0) {
+    adrDays = currentQty / dailyRateADR;
+    adrStockOutDate = new Date();
+    adrStockOutDate.setDate(adrStockOutDate.getDate() + adrDays);
+    adrStockOutDate = adrStockOutDate.toISOString().split('T')[0];
+
+    adrReorderDays = Math.max(0, (currentQty - reorderLevel) / dailyRateADR);
+    adrReorderDate = new Date();
+    adrReorderDate.setDate(adrReorderDate.getDate() + adrReorderDays);
+    adrReorderDate = adrReorderDate.toISOString().split('T')[0];
+  }
+
+  // 2. Exponential Moving Average (EMA)
+  const alpha = 0.3;
+  let emaWeekly = weeklyUsage[0];
+  for (let i = 1; i < 12; i++) {
+    emaWeekly = alpha * weeklyUsage[i] + (1 - alpha) * emaWeekly;
+  }
+  const dailyRateEMA = emaWeekly / 7;
+
+  let emaDays = null;
+  let emaStockOutDate = null;
+  let emaReorderDays = null;
+  let emaReorderDate = null;
+
+  if (dailyRateEMA > 0) {
+    emaDays = currentQty / dailyRateEMA;
+    emaStockOutDate = new Date();
+    emaStockOutDate.setDate(emaStockOutDate.getDate() + emaDays);
+    emaStockOutDate = emaStockOutDate.toISOString().split('T')[0];
+
+    emaReorderDays = Math.max(0, (currentQty - reorderLevel) / dailyRateEMA);
+    emaReorderDate = new Date();
+    emaReorderDate.setDate(emaReorderDate.getDate() + emaReorderDays);
+    emaReorderDate = emaReorderDate.toISOString().split('T')[0];
+  }
+
+  // 3. Linear Regression
+  let sumX = 0;
+  let sumY = 0;
+  let sumXY = 0;
+  let sumX2 = 0;
+  const N = 12;
+  for (let i = 0; i < N; i++) {
+    const x = i + 1;
+    const y = weeklyUsage[i];
+    sumX += x;
+    sumY += y;
+    sumXY += x * y;
+    sumX2 += x * x;
+  }
+  const slope = (N * sumXY - sumX * sumY) / (N * sumX2 - sumX * sumX);
+  const intercept = (sumY - slope * sumX) / N;
+
+  const regWeeklyForecast = Math.max(0, slope * 13 + intercept);
+  const dailyRateReg = regWeeklyForecast / 7;
+
+  let regDays = null;
+  let regStockOutDate = null;
+  let regReorderDays = null;
+  let regReorderDate = null;
+
+  if (dailyRateReg > 0) {
+    regDays = currentQty / dailyRateReg;
+    regStockOutDate = new Date();
+    regStockOutDate.setDate(regStockOutDate.getDate() + regDays);
+    regStockOutDate = regStockOutDate.toISOString().split('T')[0];
+
+    regReorderDays = Math.max(0, (currentQty - reorderLevel) / dailyRateReg);
+    regReorderDate = new Date();
+    regReorderDate.setDate(regReorderDate.getDate() + regReorderDays);
+    regReorderDate = regReorderDate.toISOString().split('T')[0];
+  }
+
+  // Fallbacks if EMA/Regression calculations result in zero rate
+  let primaryRate = dailyRateADR;
+  let primaryDays = adrDays;
+  let primaryStockOutDate = adrStockOutDate;
+  let primaryReorderDate = adrReorderDate;
+
+  let status = 'stable';
+  if (primaryDays !== null) {
+    if (primaryDays <= 7) status = 'critical';
+    else if (primaryDays <= 30) status = 'warning';
+  }
+
+  const bufferDays = 45;
+  const recommendedQty = Math.max(0, Math.ceil(primaryRate * bufferDays - currentQty));
+
+  return {
+    material_id: material.id,
+    name: material.name,
+    material_code: material.material_id,
+    category: material.category,
+    unit: material.unit,
+    current_quantity: currentQty,
+    min_stock_level: minStock,
+    reorder_level: reorderLevel,
+    has_history: true,
+    status,
+    recommended_reorder_qty: recommendedQty,
+    primary_forecast: {
+      daily_rate: +primaryRate.toFixed(2),
+      days_remaining: primaryDays !== null ? +primaryDays.toFixed(0) : null,
+      stockout_date: primaryStockOutDate,
+      reorder_date: primaryReorderDate
+    },
+    weekly_history: weeklyUsage,
+    models: {
+      adr: {
+        name: 'Average Daily Rate',
+        daily_rate: +dailyRateADR.toFixed(2),
+        days_remaining: adrDays !== null ? +adrDays.toFixed(0) : null,
+        stockout_date: adrStockOutDate,
+        reorder_date: adrReorderDate
+      },
+      ema: {
+        name: 'Exponential Moving Average (EMA)',
+        daily_rate: +dailyRateEMA.toFixed(2),
+        days_remaining: emaDays !== null ? +emaDays.toFixed(0) : null,
+        stockout_date: emaStockOutDate,
+        reorder_date: emaReorderDate
+      },
+      regression: {
+        name: 'Linear Regression (Trend)',
+        daily_rate: +dailyRateReg.toFixed(2),
+        days_remaining: regDays !== null ? +regDays.toFixed(0) : null,
+        stockout_date: regStockOutDate,
+        reorder_date: regReorderDate,
+        slope: +slope.toFixed(2),
+        intercept: +intercept.toFixed(2)
+      }
+    }
+  };
+}
+
+exports.getForecast = async (req, res) => {
+  try {
+    const { id, days = 90 } = req.query;
+    const orgId = req.user.org_id;
+
+    const fromDate = new Date();
+    fromDate.setDate(fromDate.getDate() - parseInt(days));
+    const fromDateStr = fromDate.toISOString().split('T')[0];
+
+    if (id) {
+      const material = await db('materials').where({ id, org_id: orgId }).first();
+      if (!material) return res.status(404).json({ error: 'Material not found' });
+
+      const sivs = await db('store_issue_vouchers')
+        .where({ org_id: orgId, material_id: id, status: 'issued' })
+        .where('date_issued', '>=', fromDateStr)
+        .orderBy('date_issued', 'asc');
+
+      const forecast = calculateMaterialForecast(material, sivs);
+      return res.json(forecast);
+    } else {
+      const materials = await db('materials').where({ org_id: orgId });
+      const sivs = await db('store_issue_vouchers')
+        .where({ org_id: orgId, status: 'issued' })
+        .where('date_issued', '>=', fromDateStr);
+
+      const forecasts = materials.map(m => {
+        const materialSivs = sivs.filter(s => s.material_id === m.id);
+        return calculateMaterialForecast(m, materialSivs);
+      });
+
+      return res.json(forecasts);
+    }
+  } catch (err) {
+    console.error('getForecast error:', err);
+    res.status(500).json({ error: 'Failed to generate demand forecasts' });
+  }
+};

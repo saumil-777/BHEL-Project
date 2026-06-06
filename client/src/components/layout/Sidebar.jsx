@@ -37,6 +37,7 @@ const NAV_ITEMS = [
   {
     section: 'Analytics',
     items: [
+      { to: '/forecast', icon: '📈', label: 'Stock Predictor' },
       { to: '/reports', icon: '📋', label: 'Reports' },
       { to: '/audit-logs', icon: '🔍', label: 'Audit Logs', roles: ['super_admin', 'org_admin'] },
     ]

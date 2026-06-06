@@ -74,6 +74,7 @@ export const materialsService = {
   bulkImport: (materials) => api.post('/materials/bulk-import', { materials }),
   getCategories: () => api.get('/materials/categories'),
   getLowStock: () => api.get('/materials/low-stock'),
+  getForecasts: (params) => api.get('/materials/forecast', { params }),
 };
 
 export const vendorsService = {

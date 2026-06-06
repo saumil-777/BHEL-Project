@@ -30,6 +30,7 @@ router.get('/dashboard', authenticate, mainCtrl.getDashboard);
 router.get('/materials', authenticate, materialsCtrl.getAll);
 router.get('/materials/categories', authenticate, materialsCtrl.getCategories);
 router.get('/materials/low-stock', authenticate, materialsCtrl.getLowStock);
+router.get('/materials/forecast', authenticate, materialsCtrl.getForecast);
 router.get('/materials/:id', authenticate, materialsCtrl.getOne);
 router.post('/materials', authenticate, authorize(...MANAGER_ROLES), auditLog('CREATE', 'material'), materialsCtrl.create);
 router.put('/materials/:id', authenticate, authorize(...MANAGER_ROLES), auditLog('UPDATE', 'material'), materialsCtrl.update);

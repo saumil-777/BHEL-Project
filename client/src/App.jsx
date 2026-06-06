@@ -24,6 +24,7 @@ import UsersPage from './pages/settings/UsersPage';
 import NotFoundPage from './pages/NotFoundPage';
 import CNotesPage from './pages/cnotes/CNotesPage';
 import SIVPage from './pages/siv/SIVPage';
+import ForecastPage from './pages/Forecast';
 
 const ProtectedRoute = ({ children, roles }) => {
   const { user, loading } = useAuth();
@@ -50,6 +51,7 @@ function AppRoutes() {
         <Route path="vendors/:id" element={<VendorDetailPage />} />
         <Route path="cnotes" element={<CNotesPage />} />
         <Route path="sivs" element={<SIVPage />} />
+        <Route path="forecast" element={<ForecastPage />} />
         <Route path="quality" element={<QualityPage />} />
         <Route path="inventory" element={<InventoryPage />} />
         <Route path="warehouse" element={<WarehousePage />} />
